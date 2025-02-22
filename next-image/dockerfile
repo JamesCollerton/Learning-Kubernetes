@@ -1,10 +1,10 @@
 FROM node:20-alpine
 WORKDIR /kubernetes-next-app
 
-COPY package*.json ./
+COPY ./kubernetes-next-app/package*.json ./
 RUN npm install
 
-COPY . .
+COPY ./kubernetes-next-app .
 
 RUN npm run build
 
