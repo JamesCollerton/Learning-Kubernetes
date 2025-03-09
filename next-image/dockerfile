@@ -1,11 +1,30 @@
-FROM node:20-alpine
-WORKDIR /kubernetes-next-app
+# FROM node:20-alpine
+# WORKDIR /kubernetes-next-app
 
-COPY ./kubernetes-next-app/package*.json ./
-RUN npm install
+# COPY ./kubernetes-next-app/package*.json ./
+# RUN npm install
+
+# COPY ./kubernetes-next-app .
+
+# RUN npm run build
+
+# CMD npm start
+
+FROM node:20-alpine AS builder
+WORKDIR /kubernetes-next-app
 
 COPY ./kubernetes-next-app .
 
+RUN npm install
 RUN npm run build
 
-CMD npm start
+FROM node:20-alpine AS runner
+WORKDIR /kubernetes-next-app
+
+RUN mkdir .next
+
+COPY --from=builder /kubernetes-next-app/public ./public
+COPY --from=builder /kubernetes-next-app/.next/standalone ./
+COPY --from=builder /kubernetes-next-app/.next/static ./.next/static
+
+CMD ["node", "server.js"]
