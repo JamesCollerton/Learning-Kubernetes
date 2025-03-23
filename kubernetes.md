@@ -179,6 +179,9 @@ metadata:
 
 - Provide isolation and access control, so that each microservice can control the degree to which other services interact with it.
 - A namespace in Kubernetes is an entity for organizing Kubernetes resources. You can think of it like a folder in a filesystem.
+- Namespaces are intended for use in environments with many users spread across multiple teams, or projects. For clusters with a few to tens of users, you should not need to create or think about namespaces at all. Start using namespaces when you need the features they provide.
+- Namespaces provide a scope for names. Names of resources need to be unique within a namespace, but not across namespaces. Namespaces cannot be nested inside one another and each Kubernetes resource can only be in one namespace.
+- Namespaces are a way to divide cluster resources between multiple users (via resource quota).
 
 #### Commands
 
@@ -192,6 +195,7 @@ metadata:
 - If you want to change the default namespace more permanently, you can use a context.
 - This gets recorded in a kubectl configuration file, usually located at `$HOME/.kube/config`.
 - Configuration file also stores how to both find and authenticate to your cluster.
+- The kubernetes concept (and term) context only applies in the kubernetes client-side, i.e. the place where you run the kubectl command, e.g. your command prompt. The kubernetes server-side doesn't recognise this term 'context'. This is different to namespacesm which exist server-side.
 
 #### Commands
 
@@ -241,6 +245,7 @@ metadata:
 ### Labels and Annotations
 
 - Labels and annotations are tags for your objects.
+- Way of identifying different objects in the same namespace.
 
 #### Commands
 
@@ -382,7 +387,6 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 # Structure
 
-
 ## Images
 
 ### Overview
@@ -391,11 +395,21 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ### Containers
 
+## Context
+
+## Namespace
+
+## Labels
+
+- Difference between context, namespace and labels
+
 ## Pods
 
 ### Probes
 
 ## Deployments
+
+- A Kubernetes deployment is a resource object in Kubernetes that provides declarative updates to applications. A deployment allows you to describe an application’s life cycle, such as which images to use for the app, the number of pods there should be, and the way in which they should be updated.
 
 ## Replica Sets
 
@@ -422,6 +436,40 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 ## Ingress
 
 ### Ingress Controllers
+
+# Proposed Tasks
+
+## Set up Kind cluster
+
+We can create a cluster with
+
+`kind create cluster --config=kind-config.yaml`
+
+This will [generate a configuration file](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/) at `${HOME}/.kube/config`. This allows you to access the cluster via `kubectl`.
+
+Once we're done, we can delete the cluster with:
+
+`kind delete cluster`
+
+## Run image on a pod in a cluster
+
+Now we have our cluster up and running we can get our image running on a pod within it.
+
+1. Build the image: `docker build -t kubernetes-next-app:1.0.0 .`
+1. Load the image into the cluster: `kind load docker-image kubernetes-next-app:1.0.0`
+1. Run the image as a container on the pod, and expose it via a service: `kubectl apply -f kubernetes-next-app-manifest.yaml`
+1. Check the pod is up and running: `kubectl get pods -o wide`
+1. Check the pod logs: `kubectl logs kubernetes-next-app`
+1. Check service is up and running: `kubectl get svc kubernetes-next-app-service`
+1. Forward your local port to the service: `kubectl port-forward svc/kubernetes-next-app-service 3000:3000`
+1. Visit the running image locally: `localhost:3000`
+
+## Make the image part of a deployment
+
+Kill off one of the pods, watch another restart
+Increase the min number of replicas
+
+----
 
 List of Kubernetes terms
 
