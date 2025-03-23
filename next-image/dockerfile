@@ -1,3 +1,7 @@
+# Multi-stage builds.
+
+# Build step, this creates the production version
+# of the app
 FROM node:20-alpine AS builder
 WORKDIR /kubernetes-next-app
 
@@ -6,9 +10,12 @@ COPY ./kubernetes-next-app .
 RUN npm install
 RUN npm run build
 
+# Runs the production build.
 FROM node:20-alpine AS runner
 WORKDIR /kubernetes-next-app
 
+# Copy all production build files from build step
+# container
 RUN mkdir .next
 
 COPY --from=builder /kubernetes-next-app/public ./public
@@ -17,10 +24,10 @@ COPY --from=builder /kubernetes-next-app/.next/static ./.next/static
 
 EXPOSE 3000
 
+# Set production build environment variables so
+# that it runs at localhost:3000 and is accessible
+# via Docker
 ENV PORT=3000
-
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]

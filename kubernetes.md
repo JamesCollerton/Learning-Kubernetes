@@ -54,6 +54,8 @@
 
 ## Kubernetes
 
+### Control plane
+
 ### Pods
 
 #### Overview
@@ -101,7 +103,7 @@
     - Genuinely persisted data
 - You can use the host's file system via `hostPath`.
 - You can use remote disks with NFS and iSCSI as well as cloud provider-based storage APIs
-- 
+- Different types of volumes: persisted, projected, ephemeral
 
 #### Manifest
 
@@ -114,27 +116,27 @@ metadata:
     name: kuard
     spec:
         volumes:
-            -   name: "kuard-data"
-                nfs:
-                server: my.nfs.server.local
-                path: "/exports"
+            - name: "kuard-data"
+              nfs:
+              server: my.nfs.server.local
+              path: "/exports"
         containers:
-            - image:    gcr.io/kuar-demo/kuard-amd64:blue
-                        name: kuard
-                        ports:
-                            -   containerPort: 8080
-                                name: http
-                                protocol: TCP
-                        resources:
-                        requests:
-                            cpu: "500m"
-                            memory: "128Mi"
-                        limits:
-                            cpu: "1000m"
-                            memory: "256Mi"
+            - image: "gcr.io/kuar-demo/kuard-amd64:blue"
+              name: "kuard"
+              ports:
+                  - containerPort: 8080
+                    name: http
+                    protocol: TCP
+              resources:
+                  requests:
+                      cpu: "500m"
+                      memory: "128Mi"
+                  limits:
+                      cpu: "1000m"
+                      memory: "256Mi"
         volumeMounts:
-            -   mountPath: "/data"
-                name: "kuard-data"
+            - mountPath: "/data"
+              name: "kuard-data"
         livenessProbe:
             httpGet:
                 path: /healthy
@@ -269,6 +271,7 @@ metadata:
 ### etcd server
 
 - The `etcd` server is the storage for the cluster where all of the API objects are stored.
+- Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
 
 #### kubelet
 
@@ -282,6 +285,14 @@ metadata:
 #### Kubernetes proxy
 
 - Kubernetes proxy routes traffic to load balanced services in the cluster. It's on each node.
+kube-proxy is a network proxy that runs on each node in your cluster, implementing part of the Kubernetes Service concept.
+
+kube-proxy maintains network rules on nodes. These network rules allow network communication to your Pods from network sessions inside or outside of your cluster.
+
+kube-proxy uses the operating system packet filtering layer if there is one and it's available. Otherwise, kube-proxy forwards the traffic itself.
+
+If you use a network plugin that implements packet forwarding for Services by itself, and providing equivalent behavior to kube-proxy, then you do not need to run kube-proxy on the nodes in your cluster.
+
 
 ##### Commands
 
@@ -369,17 +380,79 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ----------------------------------------------------------------------------------------------------------------------------------------
 
+# Structure
+
+
+## Images
+
+### Overview
+
+### Optimizing Image Sizes
+
+### Containers
+
+## Pods
+
+### Probes
+
+## Deployments
+
+## Replica Sets
+
+### Observability
+
+## Nodes
+
+### Shutdowns
+
+## Control Plane
+
+### Kubernetes Scheduler
+
+## DaemonSet
+
+## Security
+
+## Configuration
+
+### ConfigMaps
+
+### Secrets
+
+## Ingress
+
+### Ingress Controllers
+
 List of Kubernetes terms
 
+
+
 Daemon sets
+    DaemonSet is a Kubernetes feature that lets you run a Kubernetes pod on all cluster nodes that meet certain criteria. Every time a new node is added to a cluster, the pod is added to it, and when a node is removed from the cluster, the pod is removed. When a DaemonSet is deleted, Kubernetes removes all the pods created by it.
+Node shutdowns
+Metrics/ Logs
 Control plane
+Probes: Liveness, readiness, start up
+Security
+Kubernetes scheduler
+Configuration
+    ConfigMaps
+    Secrets
+Ingress and ingress controllers
 Deployments
+Rollouts
+Roll backs
+Secrets
 Services
 Namespaces
     By default, the kubectl commandline tool interacts with the default namespace.
     Change with `kubectl --namespace=mystuff`
 Replica sets
 Controller manager
+Sidecars
+    https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/
+Ephemeral containers
+    https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
 Scheduler
 Etcd0
 Pods
@@ -400,4 +473,8 @@ CRUD for objects
     When you want to delete an object, you can simply run: `$ kubectl delete -f obj.yaml`. Likewise, you can delete an object using the resource type and name: `$ kubectl delete <resource-name> <obj-name>`
 Labels and annotations
     Labels and annotations are tags for your objects.
+How does DNS work?
+
+Useful diagrams
+    https://kubernetes.io/docs/concepts/architecture/
 

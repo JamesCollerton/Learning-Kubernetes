@@ -3,6 +3,8 @@ kind: Cluster
 nodes:
 - role: control-plane
   extraPortMappings:
+  # Technically don't think we need
+  # these as we're using port forwarding
   - containerPort: 3000
     hostPort: 3000
     protocol: TCP
