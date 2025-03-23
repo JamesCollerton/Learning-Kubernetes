@@ -1,3 +1,4 @@
+# Here we define a single pod running the Kubernetes next app
 apiVersion: v1
 kind: Pod
 metadata:
@@ -8,10 +9,14 @@ spec:
   containers:
   - name: kubernetes-next-app
     image: kubernetes-next-app:1.0.0
+    # We expose the 3000 pod where the container runs the application
     ports:
       - containerPort: 3000
         name: http
         protocol: TCP
+    # We also set a readinessProbe, which lets kubelet (running on the
+    # node) know when the pod is ready to serve traffic. We need this so
+    # the service knows the pod is ready
     readinessProbe:
       httpGet:
         path: /api
@@ -21,6 +26,8 @@ spec:
       periodSeconds: 10
       failureThreshold: 3
 ---
+# Here we define a service. This can group a number of pods together
+# under a single name and IP address/ DNS name
 kind: Service
 apiVersion: v1
 metadata:
