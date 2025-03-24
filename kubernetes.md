@@ -399,17 +399,25 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ## Namespace
 
-## Labels
+## Labels and annotations
 
-- Difference between context, namespace and labels
+- Difference between context, namespace, labels and annotations
 
 ## Pods
 
 ### Probes
 
+- Startup, readiness and liveness
+
 ## Deployments
 
 - A Kubernetes deployment is a resource object in Kubernetes that provides declarative updates to applications. A deployment allows you to describe an application’s life cycle, such as which images to use for the app, the number of pods there should be, and the way in which they should be updated.
+- A ReplicaSet's purpose is to maintain a stable set of replica Pods running at any given time. Usually, you define a Deployment and let that Deployment manage ReplicaSets automatically.
+- Roll out status?
+
+## Volumes
+
+- There are many [different types](https://kubernetes.io/docs/concepts/storage/volumes/).
 
 ## Replica Sets
 
@@ -425,6 +433,8 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ## DaemonSet
 
+- DaemonSet is a Kubernetes feature that lets you run a Kubernetes pod on all cluster nodes that meet certain criteria. Every time a new node is added to a cluster, the pod is added to it, and when a node is removed from the cluster, the pod is removed. When a DaemonSet is deleted, Kubernetes removes all the pods created by it.
+
 ## Security
 
 ## Configuration
@@ -437,7 +447,7 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ### Ingress Controllers
 
-# Proposed Tasks
+# Tasks
 
 ## Set up Kind cluster
 
@@ -466,8 +476,27 @@ Now we have our cluster up and running we can get our image running on a pod wit
 
 ## Make the image part of a deployment
 
-Kill off one of the pods, watch another restart
-Increase the min number of replicas
+1. Run the image as part of a replica set defined by a deployment: `kubectl apply -f kubernetes-next-app-manifest.yaml`
+1. Check the rollout status of the deployment `kubectl rollout status deployment/kubernetes-next-app-deployment`
+1. Check the pods in the replica set are up and running: `kubectl get pods -o wide`
+1. List all deployments: `kubectl get deployments`
+1. List all replica sets: `kubectl get rs`
+1. Delete the pod we created manually: `kubectl delete pod kubernetes-next-app`
+1. Choose a pod by name from this list: `kubectl get pods -o wide`
+1. Manually delete a pod: `kubectl delete pod kubernetes-next-app-deployment-6cb5c88748-dr7qz`
+1. Check another one has taken its place: `kubectl get pods -o wide`
+1. List all deployments: `kubectl get deployments`
+1. Interactively change the number of replicas to two: `kubectl edit deployments kubernetes-next-app-deployment`
+1. Check the number of pods has decreased: `kubectl get pods -o wide`
+1. Forward your local port to the service: `kubectl port-forward svc/kubernetes-next-app-service 3000:3000`
+1. Visit the running image locally: `localhost:3000`
+
+## Add a volume to the pod
+
+- [Tutorial](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/)
+- [How to SSH onto a node](https://stackoverflow.com/questions/69108075/how-to-ssh-into-kind-cluster-nodes-with-containerd-runtime)
+
+## Add a sidecar
 
 ----
 
