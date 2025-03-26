@@ -166,6 +166,7 @@ metadata:
 - Forward ports: `kubectl port-forward <pod-name> <local-port>:<pod-port>`
 - List of resources used by pods: `kubectl top pods`
 - Create a pod: `kubectl run NAME --image=<image>`
+- See events for a pod: `kubectl describe pod <name-of-pod>`
 
 ### Services
 
@@ -395,6 +396,10 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 
 ### Containers
 
+- As well as the phase of the Pod overall, Kubernetes tracks the state of each container inside a Pod. You can use container lifecycle hooks to trigger events to run at certain points in a container's lifecycle.
+- Once the scheduler assigns a Pod to a Node, the kubelet starts creating containers for that Pod using a container runtime. There are three possible container states: Waiting, Running, and Terminated.
+- Kubernetes manages containers using a [restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts) defined in the spec.
+
 ## Context
 
 ## Namespace
@@ -408,6 +413,14 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 ### Probes
 
 - Startup, readiness and liveness
+- [Types of probe](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+
+### Lifecycle
+
+- Pods follow a defined lifecycle, starting in the Pending phase, moving through Running if at least one of its primary containers starts OK, and then through either the Succeeded or Failed phases depending on whether any container in the Pod terminated in failure.
+- Whilst a Pod is running, the kubelet is able to restart containers to handle some kind of faults. 
+- Pods are only scheduled once in their lifetime; assigning a Pod to a specific node is called binding, and the process of selecting which node to use is called scheduling.
+- Once a Pod has been scheduled and is bound to a node, Kubernetes tries to run that Pod on the node. 
 
 ## Deployments
 
@@ -428,6 +441,8 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 ### Shutdowns
 
 ## Control Plane
+
+- Kubernetes uses a higher-level abstraction, called a controller, that handles the work of managing the relatively disposable Pod instances.
 
 ### Kubernetes Scheduler
 
@@ -495,8 +510,11 @@ Now we have our cluster up and running we can get our image running on a pod wit
 
 - [Tutorial](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/)
 - [How to SSH onto a node](https://stackoverflow.com/questions/69108075/how-to-ssh-into-kind-cluster-nodes-with-containerd-runtime)
+- kubectl exec --stdin --tty kubernetes-next-app-deployment-69db954778-j8s5t /bin/sh
 
 ## Add a sidecar
+
+
 
 ----
 
