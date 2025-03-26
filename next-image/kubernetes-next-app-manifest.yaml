@@ -48,7 +48,7 @@ spec:
       - name: kubernetes-next-app
         image: kubernetes-next-app:1.0.0
         volumeMounts:
-        - mountPath: /usr/share/nginx/html
+        - mountPath: /mnt/data
           name: kna-pv-storage
         # We expose the 3000 pod where the container runs the application
         ports:
