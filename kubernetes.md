@@ -407,13 +407,23 @@ Run docker container `docker run image_name:tag_name` interactively is `-it`, ma
 ## Labels and annotations
 
 - Difference between context, namespace, labels and annotations
+- Label selectors are used to filter Kubernetes objects based on a set of labels.
+- Annotations are used to provide extra information about where an object came from, how to use it, or policy around that object.
+- Annotations are used in various places in Kubernetes, with the primary use case being rolling deployments. During rolling deployments, annotations are used to track rollout status and provide the necessary information required to roll back a deployment to a previous state.
+- Annotation keys use the same format as label keys. However, because they are often used to communicate information between tools.
+- The value component of an annotation is a free-form string field. While this allows maximum flexibility as users can store arbitrary data, because this is arbitrary text, there is no validation of any format. For example, it is not uncommon for a JSON document to be encoded as a string and stored in an annotation.
+
+### Commands
+
+- `kubectl label <object-type> <object-name> "key=value"`
+- `kubectl get <object-type> --selector="key=value"`
 
 ## Pods
 
 ### Probes
 
 - Startup, readiness and liveness
-- [Types of probe](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+- [Types of probe (exec, grpc, httpGet, tcpSocket)](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
 
 ### Lifecycle
 
