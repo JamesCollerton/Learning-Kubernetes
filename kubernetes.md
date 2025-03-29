@@ -155,6 +155,14 @@ metadata:
                 failureThreshold: 3
 ```
 
+#### Sidecars
+
+- Kubernetes implements sidecar containers as a special case of init containers; sidecar containers remain running after Pod startup.
+- If an init container is created with its restartPolicy set to Always, it will start and remain running during the entire life of the Pod. This can be helpful for running supporting services separated from the main application containers.
+- If a readinessProbe is specified for this init container, its result will be used to determine the ready state of the Pod.
+- You can reuse sidecar containers for multiple applications (e.g. logging, running a server for SSL termination)
+- https://kodekloud.com/blog/kubernetes-sidecar-container/
+
 #### Commands
 
 - View logs: `kubectl logs <pod-name>`
@@ -167,10 +175,34 @@ metadata:
 - List of resources used by pods: `kubectl top pods`
 - Create a pod: `kubectl run NAME --image=<image>`
 - See events for a pod: `kubectl describe pod <name-of-pod>`
+- Get pod by label: `kubectl get pods -l key=value`
 
 ### Services
 
 - Provide load balancing, naming, and discovery to isolate one microservice from another.
+
+#### Service Discovery
+
+- Service discovery tools help solve the problem of finding which processes are listening at which addresses for which services.
+- The Domain Name System (DNS) is the traditional system of service discovery on the internet.
+- A Service object is a way to create a named label selector.
+- A service is assigned a new type of virtual IP called a cluster IP. This is a special IP address the system will load-balance across all of the Pods that are identified by the selector.
+- Because the cluster IP is virtual, it is stable, and it is appropriate to give it a DNS address.
+- Kubernetes provides a DNS service exposed to Pods running in the cluster.
+- Within a namespace, it is as easy as just using the service name to connect to one of the Pods identified by a service.
+- The Service object does is track which of your Pods are ready via a readiness check.
+- NodePorts: In addition to a cluster IP, the system picks a port (or the user can specify one), and every node in the cluster then forwards traffic to that port to the service. With this feature, if you can reach any node in the cluster you can contact a service
+- If you have support from the cloud that you are running on (and your cluster is configured to take advantage of it), you can use the LoadBalancer type. This builds on the NodePort type by additionally configuring the cloud to create a new load balancer and direct it at nodes in your cluster.
+
+##### Kube Proxy
+
+- Cluster IPs are stable virtual IPs that load-balance traffic across all of the endpoints in a service. This magic is performed by a component running on every node in the cluster called the kube-proxy
+- The kube-proxy watches for new services in the cluster via the API server. It then programs a set of iptables rules in the kernel of that host to rewrite the destinations of packets so they are directed at one of the endpoints for that service.
+
+#### Commands
+
+- Expose service: `kubectl expose <object-type> <object-name>`
+- See endpoints: `kubectl get endpoints <deployment>`
 
 ### Endpoints
 
@@ -231,6 +263,10 @@ metadata:
 
 - Provide an easy-to-use frontend that can combine multiple microservices into a single externalized API surface area.
 - Basically an API gateway
+- The Service object operates at Layer 4 (according to the OSI model1). This means that it only forwards TCP and UDP connections and doesn’t look inside of those connections.
+- For HTTP (Layer 7)-based services, we can do better. Ingress is a Kubernetes-native way to implement the “virtual hosting” pattern, basically an API gateway allowing you to route different requests to different services depending on the content (e.g. path).
+- The Ingress controller is a software system exposed outside the cluster using a service of type: LoadBalancer.
+- There is no “standard” Ingress controller that is built into Kubernetes, so the user must install one of many optional implementations.
 
 ### Nodes
 
@@ -544,6 +580,8 @@ Configuration
     ConfigMaps
     Secrets
 Ingress and ingress controllers
+Rollouts
+    Argo
 Deployments
 Rollouts
 Roll backs
