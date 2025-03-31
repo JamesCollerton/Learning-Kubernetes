@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kna-sidecar-deployment
+  labels:
+    app: kna
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kna
+  template:
+    metadata:
+      labels:
+        app: kna
+    spec:
+      volumes:
+        - name: kna-data
+          emptyDir: {}
+      containers:
+      - name: kna
+        image: kubernetes-next-app:1.0.0
+        volumeMounts:
+        - mountPath: /mnt/data
+          name: kna-data
+        ports:
+          - containerPort: 3000
+            name: http
+            protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /api
+            port: 3000
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+          periodSeconds: 10
+          failureThreshold: 3
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: kubernetes-next-app-service
+spec:
+  selector:
+    app: kubernetes-next-app
+  ports:
+  - port: 3000
+    targetPort: 3000

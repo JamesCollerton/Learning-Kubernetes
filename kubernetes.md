@@ -158,7 +158,9 @@ metadata:
 #### Sidecars
 
 - Kubernetes implements sidecar containers as a special case of init containers; sidecar containers remain running after Pod startup.
+- Normal init containers will just run on start up, do a job, then finish.
 - If an init container is created with its restartPolicy set to Always, it will start and remain running during the entire life of the Pod. This can be helpful for running supporting services separated from the main application containers.
+- The benefit of a sidecar container being independent from other init containers (without restart policy always) and from the main application container(s) within the same pod. These can be started, stopped, or restarted without affecting the main application container and other init containers.
 - If a readinessProbe is specified for this init container, its result will be used to determine the ready state of the Pod.
 - You can reuse sidecar containers for multiple applications (e.g. logging, running a server for SSL termination)
 - https://kodekloud.com/blog/kubernetes-sidecar-container/
