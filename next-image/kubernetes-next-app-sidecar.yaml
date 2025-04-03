@@ -35,14 +35,22 @@ spec:
           timeoutSeconds: 1
           periodSeconds: 10
           failureThreshold: 3
+      initContainers:
+        - name: kna-logs
+          image: alpine:latest
+          restartPolicy: Always
+          command: ['sh', '-c', 'tail -F /opt/logs.txt']
+          volumeMounts:
+            - mountPath: /mnt/data
+              name: kna-data
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: kubernetes-next-app-service
+  name: kna-service
 spec:
   selector:
-    app: kubernetes-next-app
+    app: kna
   ports:
   - port: 3000
     targetPort: 3000
