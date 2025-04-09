@@ -1,3 +1,274 @@
+# Structure
+
+# Overview
+
+- Kubernetes is an open source orchestrator for deploying containerized applications.
+- It's designed to make services:
+    - Reliable - They don't fall over
+    - Available - They can always be used and are never taken down, on purpose or otherwise
+    - Scalable - They can deal with higher traffic, without manual intervention
+- Some of its core features are:
+    - Immutability - We don't incrementally update what is deployed, we just completely replace it
+    - Declarative configuration - Deployments are defined by what we want there, not by the steps to create it
+    - Online self-healing systems - Kubernetes is constantly adjusting itself to match the declaration
+
+## Images
+
+### Overview
+
+- Application programs are typically comprised of a language runtime, libraries, and your source code.
+    - Language runtimes: The JVM for example
+    - Libraries: Things that sit on the OS, e.g. libc and libssl
+    - Source code: The code we're actually running
+- The most popular container image format is the Docker image format, which has been standardized by the Open Container Initiative to the OCI image format. Kubernetes supports both Docker- and OCI-compatible images via Docker and other runtimes.
+- A container image is a binary package that encapsulates all of the files necessary to run a program inside of an OS container.
+- Docker images aren't a single file, but are more a way of specifying which other files to pull in.
+- We create images by building on previous ones, e.g. A is OS, B adds libraries, C is runtime
+- A container image commonly comes with a container configuration, which tells us how to run the image (e.g. docker-compose).
+
+### Optimizing Image Sizes
+
+- Small image sizes means quicker deployment times.
+- Files removed by subsequent Docker layers are still there, they're just inaccessible, leading to larger binary sizes.
+- We need to be careful when changing the layers in our image. Everything after a changed layer needs to be updated, meaning we don't get the benefit of the **build cache**.
+- **Multistage builds.** With multistage builds, rather than producing a single image, a Docker file can actually produce multiple images. Each image is considered a stage. Artifacts can be copied from preceding stages to the current stage. An example Dockerfile is below.
+  ```
+  FROM node:20-alpine AS builder
+  WORKDIR /kubernetes-next-app
+  
+  COPY ./kubernetes-next-app .
+  
+  RUN npm install
+  RUN npm run build
+  
+  # Runs the production build.
+  FROM node:20-alpine AS runner
+  WORKDIR /kubernetes-next-app
+  
+  # Copy all production build files from build step
+  # container
+  RUN mkdir .next
+  
+  COPY --from=builder /kubernetes-next-app/public ./public
+  COPY --from=builder /kubernetes-next-app/.next/standalone ./
+  COPY --from=builder /kubernetes-next-app/.next/static ./.next/static
+  ```
+
+### Containers
+
+- These are basically just running images.
+
+### Commands
+
+- List images: `docker images`
+- Remove images: `docker rmi <tag-name>`/ `docker rmi <image-id>`
+- Start a container: `docker run -d --name <friendl-name> --publish <port:port mapping> <image details, e.g. gcr.io/repo/image-name:tag>`
+    - Useful flags
+        - Limit CPU/ memory (if program in the container uses too much memory, it will be terminated): `--memory 200m --memory-swap 1G --cpu-shares 1024`
+
+## Applications
+
+- The concept of the program you would like to run
+- Can be colocated on the same machines without impacting the applications themselves.
+- An increase in efficiency comes from the fact that a developer’s test environment can be quickly and cheaply created as a set of containers running in a personal view of a shared Kubernetes cluster using namespaces.
+
+## Context
+
+- A Kubernetes context is a set of configuration parameters that define which Kubernetes cluster you are interacting with, which user you are using to access it, and which namespace you are working within.
+- It basically prevents you having to specify these things with every command (e.g. no need for `-n <namespace>` on each command).
+- A "cluster" is a group of physical machines working together as a single system, while a "namespace" is a logical division within that cluster.
+- If you want to change the default namespace more permanently, you can use a context.
+- This gets recorded in a kubectl configuration file, usually located at `$HOME/.kube/config`.
+- The configuration file also stores how to both find and authenticate to your cluster.
+- The kubernetes concept (and term) context only applies in the kubernetes client-side, i.e. the place where you run the kubectl command, e.g. your command prompt. The kubernetes server-side doesn't recognise this term 'context'. This is different to namespacesm which exist server-side.
+
+### Commands
+
+- Create a context with different default namespace: `kubectl config set-context <context-name> --namespace=<namespace>`.
+- Start using your new context: `kubectl config use-context <context-name>`
+
+## Cluster
+
+- A group of machines (nodes) that work together to run containerized applications, managed by a control plane, allowing for efficient, automated, distributed, and scalable application deployment and management.
+- The worker node(s) host the Pods that are the components of the application workload. The control plane manages the worker nodes and the Pods in the cluster. In production environments, the control plane usually runs across multiple computers and a cluster usually runs multiple nodes, providing fault-tolerance and high availability.
+
+## Namespace
+
+- Namespaces are a way to organize clusters into virtual sub-clusters — they can be helpful when different teams or projects share a Kubernetes cluster.
+- Some objects are namespaced (e.g. Deployments, Services, etc.) and some are cluster-wide (e.g. StorageClass, Nodes, PersistentVolumes, etc.).
+- Namespaces are intended for use in environments with many users spread across multiple teams, or projects. 
+
+## Labels and annotations
+
+- Labels are key/value pairs that can be attached to Kubernetes objects such as Pods and ReplicaSets. They can be arbitrary, and are useful for attaching identifying information to Kubernetes objects. Labels provide the foundation for grouping objects.
+- Annotations, on the other hand, provide a storage mechanism that resembles labels: annotations are key/value pairs designed to hold nonidentifying information that can be leveraged by tools and libraries.
+- Annotations are used to provide extra information about where an object came from, how to use it, or policy around that object.
+- Annotations are used in various places in Kubernetes, with the primary use case being rolling deployments. During rolling deployments, annotations are used to track rollout status and provide the necessary information required to roll back a deployment to a previous state.
+- Annotation keys use the same format as label keys because they are often used to communicate information between tools.
+- The value component of an annotation is a free-form string field. While this allows maximum flexibility as users can store arbitrary data, because this is arbitrary text, there is no validation of any format. For example, it is not uncommon for a JSON document to be encoded as a string and stored in an annotation.
+
+### Commands
+
+- `kubectl label <object-type> <object-name> "key=value"`
+- `kubectl get <object-type> --selector="key=value"`
+
+## Pods
+
+### Overview
+
+- A Pod represents a collection of application containers and volumes running in the same execution environment. 
+- Pods, not containers, are the smallest deployable artifact in a Kubernetes cluster. This means all of the containers in a Pod always land on the same machine (node).
+
+### Usage
+
+- You will often want to colocate multiple applications into a single atomic unit, scheduled onto a single machine.
+- You might want different containers as the different part of your application have different resource requirements, but share something underlying (e.g. storage). We don't want one container to take down the other if it starts gobbling resources.
+- Applications running in the same Pod share the same IP address and port space (network namespace), have the same hostname (UTS namespace), and can communicate using native interprocess communication channels over System V IPC or POSIX message queues (IPC namespace). However, applications in different Pods are isolated from each other.
+- We only put things on the same pod if they won't work on different machines.
+
+### Working with Pods
+
+- Pods are described in a Pod manifest. The Pod manifest is just a text-file representation of the Kubernetes API object.
+- The Kubernetes API server accepts and processes Pod manifests before storing them in persistent storage (etcd).
+- The scheduler also uses the Kubernetes API to find Pods that haven’t been scheduled to a node. The scheduler then places the Pods onto nodes depending on the resources and other constraints expressed in the Pod manifests
+
+#### Full Example Pod Manifest
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+    name: kuard
+    spec:
+        volumes:
+            - name: "kuard-data"
+              nfs:
+              server: my.nfs.server.local
+              path: "/exports"
+        containers:
+            - image: "gcr.io/kuar-demo/kuard-amd64:blue"
+              name: "kuard"
+              ports:
+                  - containerPort: 8080
+                    name: http
+                    protocol: TCP
+              resources:
+                  requests:
+                      cpu: "500m"
+                      memory: "128Mi"
+                  limits:
+                      cpu: "1000m"
+                      memory: "256Mi"
+        volumeMounts:
+            - mountPath: "/data"
+              name: "kuard-data"
+        livenessProbe:
+            httpGet:
+                path: /healthy
+                port: 8080
+                initialDelaySeconds: 5
+                timeoutSeconds: 1
+                periodSeconds: 10
+                failureThreshold: 3
+        readinessProbe:
+            httpGet:
+                path: /ready
+                port: 8080
+                initialDelaySeconds: 30
+                timeoutSeconds: 1
+                periodSeconds: 10
+                failureThreshold: 3
+```
+
+### Probes/ Healthchecks
+
+- There are three categories of probe: startup, readiness and liveness.
+    - Startup: A startup probe verifies whether the application within a container is started. 
+    - Readiness: Readiness probes determine when a container is ready to start accepting traffic. 
+    - Liveness: Liveness probes determine when to restart a container. For example, liveness probes could catch a deadlock when an application is running but unable to make progress.
+- [Probes can then use different checks (e.g. exec, grpc, httpGet, tcpSocket)](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+- When you run your application as a container in Kubernetes, it is automatically kept alive for you using a process health check. This health check simply ensures that the main process of your application is always running. If it isn’t, Kubernetes restarts it.
+- However, in most cases a health check isn't enough. You also want to check the application is running and responsive (a liveness check).
+- You may also want a readiness probe, readiness describes when a container is ready to serve user requests.
+- Containers that fail liveness checks are restarted. Containers that fail readiness checks are removed from service load balancers.
+- In addition to HTTP checks, Kubernetes also supports tcpSocket health checks that open a TCP socket.
+- Finally, Kubernetes allows exec probes. These execute a script or program in the context of the container.
+
+### Resource Management
+
+- We can use Kubernetes to ensure better utilisation of underlying resources.
+- Kubernetes allows users to specify two different resource metrics. 
+    - Resource requests specify the minimum amount of a resource required to run the application.
+        - Kubernetes guarantees that these resources are available to the Pod, it's a resource minimum.
+        - Requests are used when scheduling Pods to nodes. The Kubernetes scheduler will ensure that the sum of all requests of all Pods on a node does not exceed the capacity of the node.
+    - Resource limits specify the maximum amount of a resource that an application can consume.
+
+### Lifecycle
+
+- Pods follow a defined lifecycle, starting in the Pending phase, moving through Running if at least one of its primary containers starts OK, and then through either the Succeeded or Failed phases depending on whether any container in the Pod terminated in failure.
+- Whilst a Pod is running, the kubelet is able to restart containers to handle some kind of faults. 
+- Pods are only scheduled once in their lifetime; assigning a Pod to a specific node is called binding, and the process of selecting which node to use is called scheduling.
+- Once a Pod has been scheduled and is bound to a node, Kubernetes tries to run that Pod on the node. 
+
+- As well as the phase of the Pod overall, Kubernetes tracks the state of each container inside a Pod. You can use container lifecycle hooks to trigger events to run at certain points in a container's lifecycle.
+- Once the scheduler assigns a Pod to a Node, the kubelet starts creating containers for that Pod using a container runtime. There are three possible container states: Waiting, Running, and Terminated.
+- Kubernetes manages containers using a [restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts) defined in the spec.
+
+### Sidecars
+
+- An instance of [the sidecar concept](https://learn.microsoft.com/en-us/azure/architecture/patterns/sidecar).
+- Sidecars are supporting processes or services that are deployed with the primary application.
+- Kubernetes implements sidecar containers as a special case of init containers; sidecar containers remain running after Pod startup.
+- Normal init containers will just run on start up, do a job, then finish.
+- If an init container is created with its restartPolicy set to Always, it will start and remain running during the entire life of the Pod. This can be helpful for running supporting services separated from the main application containers.
+- The benefit of a sidecar container being independent from other init containers (without restart policy always) and from the main application container(s) within the same pod. These can be started, stopped, or restarted without affecting the main application container and other init containers.
+- If a readinessProbe is specified for this init container, its result will be used to determine the ready state of the Pod.
+- You can reuse sidecar containers for multiple applications (e.g. logging, running a server for SSL termination)
+- https://kodekloud.com/blog/kubernetes-sidecar-container/
+
+## Deployments
+
+- A Kubernetes deployment is a resource object in Kubernetes that provides declarative updates to applications. A deployment allows you to describe an application’s life cycle, such as which images to use for the app, the number of pods there should be, and the way in which they should be updated.
+- A ReplicaSet's purpose is to maintain a stable set of replica Pods running at any given time. Usually, you define a Deployment and let that Deployment manage ReplicaSets automatically.
+- Roll out status?
+
+## Volumes
+
+- There are many [different types](https://kubernetes.io/docs/concepts/storage/volumes/).
+
+## Replica Sets
+
+### Observability
+
+## Nodes
+
+### Shutdowns
+
+## Control Plane
+
+- Kubernetes uses a higher-level abstraction, called a controller, that handles the work of managing the relatively disposable Pod instances.
+- https://kubernetes.io/docs/concepts/architecture/#control-plane-components
+
+### Kubernetes Scheduler
+
+## DaemonSet
+
+- DaemonSet is a Kubernetes feature that lets you run a Kubernetes pod on all cluster nodes that meet certain criteria. Every time a new node is added to a cluster, the pod is added to it, and when a node is removed from the cluster, the pod is removed. When a DaemonSet is deleted, Kubernetes removes all the pods created by it.
+
+## Security
+
+## Configuration
+
+### ConfigMaps
+
+### Secrets
+
+## Ingress
+
+### Ingress Controllers
+
+------------------------------------------------------------------------------------
+
 # Overview
 
 - Kubernetes is an open source orchestrator for deploying containerized applications.
@@ -326,7 +597,7 @@ metadata:
 - Local DNS server which is used for routing to services in the cluster.
 - What is core DNS?
 
-#### Kubernetes proxy
+#### kube-proxy
 
 - Kubernetes proxy routes traffic to load balanced services in the cluster. It's on each node.
 kube-proxy is a network proxy that runs on each node in your cluster, implementing part of the Kubernetes Service concept.
