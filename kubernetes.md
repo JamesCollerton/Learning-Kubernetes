@@ -191,17 +191,16 @@ metadata:
 - However, in most cases a health check isn't enough. You also want to check the application is running and responsive (a liveness check).
 - You may also want a readiness probe, readiness describes when a container is ready to serve user requests.
 - Containers that fail liveness checks are restarted. Containers that fail readiness checks are removed from service load balancers.
-- In addition to HTTP checks, Kubernetes also supports tcpSocket health checks that open a TCP socket.
-- Finally, Kubernetes allows exec probes. These execute a script or program in the context of the container.
 
 ### Resource Management
 
+- Done on a per-pod basis
 - We can use Kubernetes to ensure better utilisation of underlying resources.
 - Kubernetes allows users to specify two different resource metrics. 
-    - Resource requests specify the minimum amount of a resource required to run the application.
+    - Resource _requests_ specify the minimum amount of a resource required to run the application.
         - Kubernetes guarantees that these resources are available to the Pod, it's a resource minimum.
         - Requests are used when scheduling Pods to nodes. The Kubernetes scheduler will ensure that the sum of all requests of all Pods on a node does not exceed the capacity of the node.
-    - Resource limits specify the maximum amount of a resource that an application can consume.
+    - Resource _limits_ specify the maximum amount of a resource that an application can consume.
 
 ### Lifecycle
 
@@ -209,7 +208,6 @@ metadata:
 - Whilst a Pod is running, the kubelet is able to restart containers to handle some kind of faults. 
 - Pods are only scheduled once in their lifetime; assigning a Pod to a specific node is called binding, and the process of selecting which node to use is called scheduling.
 - Once a Pod has been scheduled and is bound to a node, Kubernetes tries to run that Pod on the node. 
-
 - As well as the phase of the Pod overall, Kubernetes tracks the state of each container inside a Pod. You can use container lifecycle hooks to trigger events to run at certain points in a container's lifecycle.
 - Once the scheduler assigns a Pod to a Node, the kubelet starts creating containers for that Pod using a container runtime. There are three possible container states: Waiting, Running, and Terminated.
 - Kubernetes manages containers using a [restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts) defined in the spec.
@@ -220,52 +218,295 @@ metadata:
 - Sidecars are supporting processes or services that are deployed with the primary application.
 - Kubernetes implements sidecar containers as a special case of init containers; sidecar containers remain running after Pod startup.
 - Normal init containers will just run on start up, do a job, then finish.
-- If an init container is created with its restartPolicy set to Always, it will start and remain running during the entire life of the Pod. This can be helpful for running supporting services separated from the main application containers.
+- If an init container is created with its restartPolicy set to Always, it will start and remain running during the entire life of the Pod. This can be helpful for running supporting services separated from the main application containers (a.k.a. sidecars).
 - The benefit of a sidecar container being independent from other init containers (without restart policy always) and from the main application container(s) within the same pod. These can be started, stopped, or restarted without affecting the main application container and other init containers.
 - If a readinessProbe is specified for this init container, its result will be used to determine the ready state of the Pod.
 - You can reuse sidecar containers for multiple applications (e.g. logging, running a server for SSL termination)
-- https://kodekloud.com/blog/kubernetes-sidecar-container/
+- [Useful tutorial](https://kodekloud.com/blog/kubernetes-sidecar-container/)
 
 ## Deployments
 
 - A Kubernetes deployment is a resource object in Kubernetes that provides declarative updates to applications. A deployment allows you to describe an application’s life cycle, such as which images to use for the app, the number of pods there should be, and the way in which they should be updated.
+- You describe a desired state in a Deployment, and the Deployment Controller changes the actual state to the desired state at a controlled rate.
 - A ReplicaSet's purpose is to maintain a stable set of replica Pods running at any given time. Usually, you define a Deployment and let that Deployment manage ReplicaSets automatically.
-- Roll out status?
+- Example deployment configuration:
+```
+kind: Deployment
+metadata:
+  name: kubernetes-next-app-deployment
+  labels:
+    app: kubernetes-next-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubernetes-next-app
+  template:
+    metadata:
+      labels:
+        app: kubernetes-next-app
+    spec:
+      volumes:
+        - name: kna-pv-storage
+          persistentVolumeClaim:
+            claimName: kna-pv-claim
+      containers:
+      - name: kubernetes-next-app
+        image: kubernetes-next-app:1.0.0
+        volumeMounts:
+        - mountPath: /mnt/data
+          name: kna-pv-storage
+        # We expose the 3000 pod where the container runs the application
+        ports:
+          - containerPort: 3000
+            name: http
+            protocol: TCP
+        # We also set a readinessProbe, which lets kubelet (running on the
+        # node) know when the pod is ready to serve traffic. We need this so
+        # the service knows the pod is ready
+        readinessProbe:
+          httpGet:
+            path: /api
+            port: 3000
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+          periodSeconds: 10
+          failureThreshold: 3
+```
+
+<!-- - TODO: How do we define an HPA with a deployment? -->
 
 ## Volumes
 
-- There are many [different types](https://kubernetes.io/docs/concepts/storage/volumes/).
+- Why we need volumes
+    - **Data persistence:** On-disk files in a container are ephemeral, which presents some problems for non-trivial applications when running in containers. One problem occurs when a container crashes or is stopped, the container state is not saved so all of the files that were created or modified during the lifetime of the container are lost. After a crash, kubelet restarts the container with a clean state.
+    - **Shared storage:** Another problem occurs when multiple containers are running in a Pod and need to share files. It can be challenging to set up and access a shared filesystem across all of the containers.
+- Ephemeral volume types have a lifetime linked to a specific Pod, but persistent volumes exist beyond the lifetime of any individual pod. 
+- To use a volume, specify the volumes to provide for the Pod in `.spec.volumes` and declare where to mount those volumes into containers in `.spec.containers[*].volumeMounts`.
+- When a pod is launched, a process in the container sees a filesystem view composed from the initial contents of the container image, plus volumes (if defined) mounted inside the container. The process sees a root filesystem that initially matches the contents of the container image. Any writes to within that filesystem hierarchy, if allowed, affect what that process views when it performs a subsequent filesystem access. Volumes are mounted at specified paths within the container filesystem. For each container defined within a Pod, you must independently specify where to mount each volume that the container uses.
+- There are many [different types of volume, including cloud-based ones (e.g. S3)](https://kubernetes.io/docs/concepts/storage/volumes/).
+
+### ConfigMap
+
+- A ConfigMap provides a way to inject configuration data into pods. The data stored in a ConfigMap can be referenced in a volume of type configMap and then consumed by containerized applications running in a pod.
+- The log-config ConfigMap is mounted as a volume, and all contents stored in its log_level entry are mounted into the Pod at path /etc/config/log_level.conf. Note that this path is derived from the volume's mountPath and the path keyed with log_level.
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-pod
+spec:
+  containers:
+    - name: test
+      image: busybox:1.28
+      command: ['sh', '-c', 'echo "The app is running!" && tail -f /dev/null']
+      volumeMounts:
+        - name: config-vol
+          mountPath: /etc/config
+  volumes:
+    - name: config-vol
+      configMap:
+        name: log-config
+        items:
+          - key: log_level
+            path: log_level.conf
+```
+
+### EmptyDir
+
+- For a Pod that defines an emptyDir volume, the volume is created when the Pod is assigned to a node. As the name says, the emptyDir volume is initially empty. All containers in the Pod can read and write the same files in the emptyDir volume, though that volume can be mounted at the same or different paths in each container.
 
 ## Replica Sets
 
+- A ReplicaSet acts as a cluster-wide Pod manager, ensuring that the right types and number of Pods are running at all times.
+- Provide the underpinnings of self-healing for our applications at the infrastructure level.
+- When we define a ReplicaSet, we define a specification for the Pods we want to create (the “cookie cutter”), and a desired number of replicas. Additionally, we need to define a way of finding Pods that the ReplicaSet should control. 
+- The actual act of managing the replicated Pods is an example of a reconciliation loop.
+- The central concept behind a reconciliation loop is the notion of desired state versus observed or current state.
+- The relationship between ReplicaSets and Pods is loosely coupled.
+- Sets use label queries to identify the set of Pods they should be managing.
+- Quarantining: doing so will disassociate it from the ReplicaSet (and service) so that you can debug the Pod.
+- When the number of Pods in the current state is less than the number of Pods in the desired state, the ReplicaSet controller will create new Pods.
+- You can create a ReplicaSet using manifest files in the same way as any other object
+- You can do things like find which Replica Set is controlling a pod, or find all pods in a Replica Set.
+- You can scale ReplicaSets specifically using `kubectl scale`, e.g. `kubectl scale replicasets kuard --replicas=4`
+
+### Autoscaling and HPA
+
+- You may want to scale dependent on different factors - for example, with a web server like NGINX, you may want to scale due to CPU usage. For an in-memory cache, you may want to scale with memory consumption.
+- Kubernetes can handle all of these scenarios via Horizontal Pod Autoscaling (HPA).
+- HPA requires the presence of the `heapster` Pod on your cluster. `heapster` keeps track of metrics and provides an API for consuming metrics that HPA uses when making scaling decisions.
+
+### Commands
+
+- Scale a replica set to a certain number of pods: `kubectl scale replicasets kuard --replicas=4`
+- Set scaling based on CPU: `kubectl autoscale rs kuard --min=2 --max=5 --cpu-percent=80`
+- See all HPAs: `kubectl get hpa`
+
 ### Observability
+
+- Logs from containers running on a pod can be viewed via `kubectl logs`.
+- You can go into your container and have a poke around via `kubectl exec`.
+- You can view metrics with `kubectl top pod`
+
+#### Commands
+
+- View logs: `kubectl logs <pod-name>`
+- Execute command in shell: `kubectl exec -it <pod-name> -- <command, e.g. bash>`
+- View metrics for pod: `kubectl top pod <pod-name>`
 
 ## Nodes
 
-### Shutdowns
+- Kubernetes runs your workload by placing containers into Pods to run on Nodes. 
+- A node may be a virtual or physical machine, depending on the cluster.
+- Nodes are separated into master nodes (core processes, e.g. scheduler) and worker nodes (your application).
+- The components on a node include the kubelet, a container runtime, and the kube-proxy.
+
+### Commands
+
+- List all nodes: `kubectl get nodes`
+
+<!-- ### Shutdowns
+
+TODO: Add a bit more information here -->
 
 ## Control Plane
 
-- Kubernetes uses a higher-level abstraction, called a controller, that handles the work of managing the relatively disposable Pod instances.
+- The control plane's components make global decisions about the cluster (for example, scheduling), as well as detecting and responding to cluster events (for example, starting up a new pod when a Deployment's replicas field is unsatisfied)
+- kube-apiserver: Exposes the Kubernetes API.
+- etcd: Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
+- kube-scheduler: Control plane component that watches for newly created Pods with no assigned node, and selects a node for them to run on.
+- kube-controller-manager: Runs controller processes
+    - Node controller: Responsible for noticing and responding when nodes go down.
+    - Job controller: Watches for Job objects that represent one-off tasks, then creates Pods to run those tasks to completion.
+    - EndpointSlice controller: Populates EndpointSlice objects (to provide a link between Services and Pods).
+    - ServiceAccount controller: Create default ServiceAccounts for new namespaces.
+- cloud-controller-manager: Cloud-specific control logic
+<!-- - TODO: Where does the control plane run? Add more detail. -->
 - https://kubernetes.io/docs/concepts/architecture/#control-plane-components
 
 ### Kubernetes Scheduler
 
+- The scheduler is responsible for placing different Pods onto different nodes in the cluster.
+- The scheduler also uses the Kubernetes API to find Pods that haven’t been scheduled to a node. The scheduler then places the Pods onto nodes depending on the resources and other constraints expressed in the Pod manifests
+- Scheduling multiple replicas of the same application onto the same machine is worse for reliability, since the machine is a single failure domain. Consequently, the Kubernetes scheduler tries to ensure that Pods from the same application are distributed onto different machines for reliability in the presence of such failures.
+- Once scheduled to a node, Pods don’t move and must be explicitly destroyed and rescheduled.
+
 ## DaemonSet
 
-- DaemonSet is a Kubernetes feature that lets you run a Kubernetes pod on all cluster nodes that meet certain criteria. Every time a new node is added to a cluster, the pod is added to it, and when a node is removed from the cluster, the pod is removed. When a DaemonSet is deleted, Kubernetes removes all the pods created by it.
+- DaemonSet is a Kubernetes feature that lets you run a Kubernetes pod on all cluster nodes that meet certain criteria. 
+- This might be to add an agent to every node (e.g. a log collector).
+- Every time a new node is added to a cluster, the pod is added to it, and when a node is removed from the cluster, the pod is removed. When a DaemonSet is deleted, Kubernetes removes all the pods created by it.
+- DaemonSets have an equivalent to the
+Deployment object that manages a DaemonSet rollout inside the cluster. DaemonSets can be rolled out using the same `RollingUpdate` strategy that deployments
+use.
+- DaemonSets provide an easy-to-use abstraction for running a set of Pods on every node in a Kubernetes cluster, or, if the case requires it, on a subset of nodes based on labels. 
+- The DaemonSet provides its own controller and scheduler to ensure key services like monitoring agents are always up and running on the right nodes in your
+cluster.
+
+### Useful commands
+
+- List daemonSets `kubectl get daemonSets`
+- Examine a daemonSet `kubectl describe daemonset <name>`
 
 ## Security
 
 ## Configuration
 
-### ConfigMaps
-
-### Secrets
+### Secrets (should this be in volumes?)
 
 ## Ingress
 
 ### Ingress Controllers
+
+## kubelet
+
+## DNS
+
+## Jobs
+
+- A job creates Pods that run until successful termination (i.e., exit with 0).
+
+### Job Object
+
+- The Job object is responsible for creating and managing Pods defined in a template in the job specification.
+- The Job object coordinates running a number of Pods in parallel.
+
+### Job Patterns
+
+- One shot (e.g. database migrations): A single pod running once until completions.
+
+```
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: oneshot
+spec:
+    template:
+        spec:
+            containers:
+                - name: kuard
+                image: gcr.io/kuar-demo/kuard-amd64:blue
+                imagePullPolicy: Always
+                args:
+                    - "--keygen-enable"
+                    - "--keygen-exit-on-complete"
+                    - "--keygen-num-to-gen=10"
+                restartPolicy: OnFailure
+```
+
+- Parallel fixed computations (e.g. multiple pods processing a set of work in parallel): One or more pods running once until a fixed completion count
+
+```
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: parallel
+    labels:
+        chapter: jobs
+spec:
+    parallelism: 5
+    completions: 10
+    template:
+        metadata:
+            labels:
+                chapter: jobs
+        spec:
+            containers:
+                - name: kuard
+                image: gcr.io/kuar-demo/kuard-amd64:blue
+                imagePullPolicy: Always
+                args:
+                    - "--keygen-enable"
+                    - "--keygen-exit-on-complete"
+                    - "--keygen-num-to-gen=10"
+            restartPolicy: OnFailure
+```
+
+- Work queue of parallel jobs (e.g. multiple pods processing from a centralized work queue): One or more pods running once until successful termination
+    - As the completions
+parameter is unset, we put the job into a worker pool mode.
+
+- Cronjobs - sometimes you want to schedule a job to be run at a certain interval.
+
+```
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+    name: example-cron
+spec:
+    # Run every fifth hour
+    schedule: "0 */5 * * *"
+    jobTemplate:
+        spec:
+            template:
+                spec:
+                    containers:
+                    - name: batch-job
+                    image: my-batch-image
+                    restartPolicy: OnFailure
+```
 
 ------------------------------------------------------------------------------------
 
@@ -833,7 +1074,7 @@ Now we have our cluster up and running we can get our image running on a pod wit
 
 ## Add a sidecar
 
-
+## Set up an HPA
 
 ----
 
