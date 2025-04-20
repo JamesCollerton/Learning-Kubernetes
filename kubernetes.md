@@ -317,6 +317,32 @@ spec:
 
 - For a Pod that defines an emptyDir volume, the volume is created when the Pod is assigned to a node. As the name says, the emptyDir volume is initially empty. All containers in the Pod can read and write the same files in the emptyDir volume, though that volume can be mounted at the same or different paths in each container.
 
+### Secrets
+
+- Secret data can be exposed to Pods using the secrets volume type.
+- Secrets are similar to ConfigMaps but are specifically intended to hold confidential data.
+- Secrets are stored on tmpfs volumes (aka RAM disks), and as such are not written to disk on nodes.
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+    name: kuard-tls
+spec:
+    containers:
+    - name: kuard-tls
+    image: gcr.io/kuar-demo/kuard-amd64:blue
+    imagePullPolicy: Always
+    volumeMounts:
+    - name: tls-certs
+    mountPath: "/tls"
+    readOnly: true
+    volumes:
+        - name: tls-certs
+        secret:
+        secretName: kuard-tls
+```
+
 ## Replica Sets
 
 - A ReplicaSet acts as a cluster-wide Pod manager, ensuring that the right types and number of Pods are running at all times.
@@ -360,8 +386,19 @@ spec:
 
 - Kubernetes runs your workload by placing containers into Pods to run on Nodes. 
 - A node may be a virtual or physical machine, depending on the cluster.
-- Nodes are separated into master nodes (core processes, e.g. scheduler) and worker nodes (your application).
+- Nodes are separated into master nodes (AKA the control plane, runs core processes, e.g. scheduler) and worker nodes (your application).
 - The components on a node include the kubelet, a container runtime, and the kube-proxy.
+
+### Kubelet
+
+- An agent that runs on each node in the cluster. It makes sure that containers are running in a Pod.
+- The kubelet takes a set of PodSpecs that are provided through various mechanisms and ensures that the containers described in those PodSpecs are running and healthy. The kubelet doesn't manage containers which were not created by Kubernetes.
+
+### Kube Proxy
+
+- kube-proxy is a network proxy that runs on each node in your cluster, implementing part of the Kubernetes Service concept.
+- kube-proxy maintains network rules on nodes. These network rules allow network communication to your Pods from network sessions inside or outside of your cluster.
+-  This reflects services as defined in the Kubernetes API on each node and can do simple TCP, UDP, and SCTP stream forwarding or round robin TCP, UDP, and SCTP forwarding across a set of backends
 
 ### Commands
 
@@ -374,17 +411,16 @@ TODO: Add a bit more information here -->
 ## Control Plane
 
 - The control plane's components make global decisions about the cluster (for example, scheduling), as well as detecting and responding to cluster events (for example, starting up a new pod when a Deployment's replicas field is unsatisfied)
-- kube-apiserver: Exposes the Kubernetes API.
-- etcd: Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
-- kube-scheduler: Control plane component that watches for newly created Pods with no assigned node, and selects a node for them to run on.
-- kube-controller-manager: Runs controller processes
-    - Node controller: Responsible for noticing and responding when nodes go down.
-    - Job controller: Watches for Job objects that represent one-off tasks, then creates Pods to run those tasks to completion.
-    - EndpointSlice controller: Populates EndpointSlice objects (to provide a link between Services and Pods).
-    - ServiceAccount controller: Create default ServiceAccounts for new namespaces.
-- cloud-controller-manager: Cloud-specific control logic
-<!-- - TODO: Where does the control plane run? Add more detail. -->
-- https://kubernetes.io/docs/concepts/architecture/#control-plane-components
+    - kube-apiserver: Exposes the Kubernetes API.
+    - etcd: Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
+    - kube-scheduler: Control plane component that watches for newly created Pods with no assigned node, and selects a node for them to run on.
+    - kube-controller-manager: Runs controller processes
+        - Node controller: Responsible for noticing and responding when nodes go down.
+        - Job controller: Watches for Job objects that represent one-off tasks, then creates Pods to run those tasks to completion.
+        - EndpointSlice controller: Populates EndpointSlice objects (to provide a link between Services and Pods).
+        - ServiceAccount controller: Create default ServiceAccounts for new namespaces.
+    - cloud-controller-manager: Cloud-specific control logic
+- In production environments, the control plane usually runs across multiple computers, and runs separately to the workload
 
 ### Kubernetes Scheduler
 
@@ -414,13 +450,9 @@ cluster.
 
 ## Configuration
 
-### Secrets (should this be in volumes?)
-
 ## Ingress
 
 ### Ingress Controllers
-
-## kubelet
 
 ## DNS
 
@@ -591,6 +623,7 @@ spec:
 
 #### Healthchecks
 
+- There are three main types of probe: startup, readiness and liveness.
 - When you run your application as a container in Kubernetes, it is automatically kept alive for you using a process health check. This health check simply ensures that the main process of your application is always running. If it isn’t, Kubernetes restarts it.
 - However, in most cases a health check isn't enough. You also want to check the application is running and responsive (a liveness check).
 - You may also want a readiness probe, readiness describes when a container is ready to serve user requests.
