@@ -375,6 +375,7 @@ spec:
 - Logs from containers running on a pod can be viewed via `kubectl logs`.
 - You can go into your container and have a poke around via `kubectl exec`.
 - You can view metrics with `kubectl top pod`
+- You can implement Kubernetes [audit logging](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/), which will track what happens on your cluster. 
 
 #### Commands
 
@@ -446,15 +447,43 @@ cluster.
 - List daemonSets `kubectl get daemonSets`
 - Examine a daemonSet `kubectl describe daemonset <name>`
 
-## Security
-
-## Configuration
-
 ## Ingress
 
-### Ingress Controllers
+- A critical part of any application is getting network traffic to and from that application.
+- The Service object operates at Layer 4 (according to the OSI model). This means that it only forwards TCP and UDP connections and doesn’t look inside of those connections.
+- For HTTP (Layer 7)-based services, we can do better.
+- When solving a similar problem in non-Kubernetes situations, users often turn to the idea of “virtual hosting.” This is a mechanism to host many HTTP sites on a single IP address. Typically, the user uses a load balancer or reverse proxy to accept incoming connections on HTTP (80) and HTTPS (443) ports. That program then parses the HTTP connection and, based on the Host header and the URL path that is requested, proxies the HTTP call to some other program.
+- Kubernetes calls its HTTP-based load-balancing system Ingress.
+- The Ingress controller is a software system exposed outside the cluster
+using a service of type: LoadBalancer. It then proxies requests to “upstream”
+servers. The configuration for how it does this is the result of reading and monitoring
+Ingress objects.
+- While conceptually simple, at an implementation level Ingress is very different from pretty much every other regular resource object in Kubernetes. Specifically, it is split into a common resource specification (hosted inside the cluster) and a controller implementation (hosted outside the cluster). There is no “standard” Ingress controller that is built into Kubernetes, so the user must install one of many optional implementations.
+- To make Ingress work well, you need to configure DNS entries to the external address for your load balancer. You can map multiple hostnames to a single external endpoint and the Ingress controller will play traffic cop and direct incoming requests to the appropriate upstream service based on that hostname.
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+    name: path-ingress
+spec:
+    rules:
+    - host: bandicoot.example.com
+    http:
+        paths:
+        - path: "/"
+        backend:
+            serviceName: bandicoot
+            servicePort: 8080
+        - path: "/a/"
+        backend:
+            serviceName: alpaca
+            servicePort: 8080
+```
 
 ## DNS
+
+
 
 ## Jobs
 
