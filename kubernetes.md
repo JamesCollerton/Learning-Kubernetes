@@ -483,7 +483,33 @@ spec:
 
 ## DNS
 
+- Kubernetes DNS is a built-in service within the Kubernetes platform, designed to provide name resolution for services within a Kubernetes cluster. 
+- The Kubernetes DNS service is automatically configured for each new Kubernetes cluster and assigns a DNS name to each service within the cluster. 
+- CoreDNS is the default DNS server for Kubernetes, replacing the previous default, kube-dns
+- When pods and services reside in the same namespace, they can refer to each other using their short DNS names, which consist of just the name of the pod or service
+- Your workload can discover Services within your cluster using DNS
+- Kubernetes creates DNS records for Services and Pods.
+- Services defined in the cluster are assigned DNS names.
+- A DNS query may return different results based on the namespace of the Pod making it. DNS queries that don't specify a namespace are limited to the Pod's namespace.
+- DNS queries may be expanded using the Pod's `/etc/resolv.conf.` kubelet configures this file for each Pod. 
+- What objects get DNS records?
+    - Services
+    - Pods
+- [Great article](https://yuminlee2.medium.com/kubernetes-dns-bdca7b7cb868)
+- In Kubernetes, the DNS names assigned to Pods and Services are used for name resolution within the cluster, allowing Pods and Services to communicate with each other by name instead of IP address.
+- In Kubernetes, cluster.local is a default domain name used for DNS resolution within the cluster. The Kubernetes DNS service appends the namespace and cluster.local suffix to the name to form a fully qualified domain name (FQDN) when a DNS query is made for a Service or Pod within the same namespace. 
+- The DNS name for a Service in Kubernetes follows the below format `<service-name>.<namespace>.svc.cluster.local`, e.g. `my-service.my-namespace.svc.cluster.local`
+- When Pods and Services are in the same namespace, you can use the service name instead of the fully qualified domain name (FQDN) to access Services through queries.
 
+### Services
+
+- "Normal" (not headless) Services are assigned DNS A and/or AAAA records, depending on the IP family or families of the Service, with a name of the form my-svc.my-namespace.svc.cluster-domain.example. This resolves to the cluster IP of the Service.
+- SRV Records are created for named ports that are part of normal or headless services.
+- For a regular Service, this resolves to the port number and the domain name: `my-svc.my-namespace.svc.cluster-domain.example`.
+
+### Pods
+
+- Currently when a Pod is created, its hostname (as observed from within the Pod) is the Pod's `metadata.name` value.
 
 ## Jobs
 
